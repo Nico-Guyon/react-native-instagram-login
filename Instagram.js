@@ -136,8 +136,7 @@ export default class Instagram extends Component {
         ref={(webView) => { this.webView = webView }}
         injectedJavaScript={patchPostMessageJsCode}
         cacheEnabled={false}
-        incognito={true}
-        thirdPartyCookiesEnabled={false}
+        thirdPartyCookiesEnabled={true}
         sharedCookiesEnabled={false}
         domStorageEnabled={false}
       />
