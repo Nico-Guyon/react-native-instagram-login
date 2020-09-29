@@ -5,16 +5,14 @@ import {
   StyleSheet,
   View,
   Alert,
-  Modal,
-  Dimensions,
   TouchableOpacity,
-  Image
+  Image,
 } from 'react-native'
 import qs from 'qs'
 import { WebView } from "react-native-webview";
-const { width, height } = Dimensions.get('window')
 
 import axios from 'axios'
+
 const patchPostMessageJsCode = `(${String(function () {
   var originalPostMessage = window.postMessage
   var patchedPostMessage = function (message, targetOrigin, transfer) {
@@ -23,7 +21,7 @@ const patchPostMessageJsCode = `(${String(function () {
   patchedPostMessage.toString = function () {
     return String(Object.hasOwnProperty).replace('hasOwnProperty', 'postMessage')
   }
-  window.postMessage = patchedPostMessage
+  window.postMessage = patchedPostMessage;
 })})();`
 
 export default class Instagram extends Component {
@@ -35,12 +33,18 @@ export default class Instagram extends Component {
     }
   }
 
-  show() {
-    this.setState({ modalVisible: true })
+  reload() {
+    this.webView.reload();
   }
 
   hide() {
-    this.setState({ modalVisible: false })
+    this.webView.reload();
+    const { key } = this.state;
+    this.setState({ key: key + 1 , modalVisible: false });
+  }
+
+  show() {
+    this.setState({ modalVisible: true })
   }
 
   async _onNavigationStateChange(webViewState) {
@@ -57,6 +61,10 @@ export default class Instagram extends Component {
         // Keeping this to keep it backwards compatible, but also returning raw results to account for future changes.
         this.props.onLoginSuccess(results.access_token, results)
       } else if (results.code) {
+
+        const first_page_load = webViewState?.loading === false && webViewState?.title === '';
+        if(!first_page_load)
+          return;
 
         //Fetching to get token with appId, appSecret and code
         let { code } = results
@@ -83,6 +91,10 @@ export default class Instagram extends Component {
 
 
       } else {
+        const first_page_load = webViewState?.loading === false && webViewState?.title === '';
+        if(!first_page_load)
+          return;
+
         this.props.onLoginFailure(results)
       }
     }
@@ -98,11 +110,6 @@ export default class Instagram extends Component {
     } catch (err) { }
   }
 
-  // _onLoadEnd () {
-  //   const scriptToPostBody = "window.postMessage(document.body.innerText, '*')"
-  //     this.webView.injectJavaScript(scriptToPostBody)
-  // }
-
   renderClose() {
     const { renderClose } = this.props
     if (renderClose) return renderClose()
@@ -117,6 +124,14 @@ export default class Instagram extends Component {
     this.setState({ modalVisible: false })
   }
 
+  onHttpError(syntheticEvent) {
+    const {nativeEvent} = syntheticEvent;
+  }
+
+  reset_url() {
+    this.webView.reload();
+  }
+
   renderWebview() {
     const { appId, appSecret, redirectUrl, scopes, responseType } = this.props
     const { key } = this.state
@@ -128,10 +143,12 @@ export default class Instagram extends Component {
         {...this.props}
         key={key}
         style={[styles.webView, this.props.styles.webView]}
+        containerStyle={{ flex: 1 }}
         source={{ uri: ig_uri }}
         startInLoadingState
         onNavigationStateChange={this._onNavigationStateChange.bind(this)}
         onError={this._onNavigationStateChange.bind(this)}
+        onHttpError={this.onHttpError.bind(this)}
         onMessage={this._onMessage.bind(this)}
         ref={(webView) => { this.webView = webView }}
         injectedJavaScript={patchPostMessageJsCode}
@@ -143,31 +160,27 @@ export default class Instagram extends Component {
     )
   }
 
-  render() {
-    const { wrapperStyle, containerStyle, closeStyle } = this.props
-    return (
-      <Modal
-        animationType={'slide'}
-        visible={this.state.modalVisible}
-        onRequestClose={this.hide.bind(this)}
-        transparent
-      >
-        <View style={[styles.container, containerStyle]}>
-          <View style={[styles.wrapper, wrapperStyle]}>{this.renderWebview()}</View>
-          <TouchableOpacity
-            onPress={() => this.onClose()}
-            style={[styles.close, closeStyle]}
-            accessibilityComponentType={'button'}
-            accessibilityTraits={['button']}
-          >
-            {this.renderClose()}
-          </TouchableOpacity>
-        </View>
-      </Modal >
+  componentDidMount() {
+    console.log('mounting done');
+  }
 
+
+  render() {
+    const { modalStyle, wrapperStyle, containerStyle, closeStyle } = this.props
+    const { modalVisible } = this.state;
+
+    const height = modalVisible ? '100%' : '0%';
+    const border = modalVisible ? 1 : 0;
+
+    return (
+      <View style={{position: 'absolute', width:'100%', height: height}}>
+        <TouchableOpacity style={{flex: 0.1, borderBottomColor: '#FF510D', borderBottomWidth: border,}} onPress={() => this.hide()}></TouchableOpacity>
+        {this.renderWebview()}
+      </View>
     )
   }
 }
+
 const propTypes = {
   appId: PropTypes.string.isRequired,
   appSecret: PropTypes.string.isRequired,
@@ -180,6 +193,7 @@ const propTypes = {
   containerStyle: PropTypes.object,
   wrapperStyle: PropTypes.object,
   closeStyle: PropTypes.object,
+  modalStyle: PropTypes.object,
 }
 
 const defaultProps = {
@@ -207,7 +221,8 @@ Instagram.defaultProps = defaultProps
 
 const styles = StyleSheet.create({
   webView: {
-    flex: 1
+    flex: 1,
+    alignSelf: 'stretch', 
   },
   container: {
     flex: 1,
