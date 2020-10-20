@@ -48,54 +48,58 @@ export default class Instagram extends Component {
   }
 
   async _onNavigationStateChange(webViewState) {
-    const { url } = webViewState
-    const { key } = this.state
-    if (webViewState.title === 'Instagram' && webViewState.url === 'https://www.instagram.com/') {
-      this.setState({ key: key + 1 })
+    const { url } = webViewState;
+    const { key } = this.state;
+    if (
+      webViewState.title === 'Instagram' &&
+      webViewState.url === 'https://www.instagram.com/'
+    ) {
+      this.setState({ key: key + 1 });
     }
     if (url && url.startsWith(this.props.redirectUrl)) {
-      const match = url.match(/(#|\?)(.*)/)
-      const results = qs.parse(match[2])
-      this.hide()
+      this.webView.stopLoading();
+      const match = url.match(/(#|\?)(.*)/);
+      const results = qs.parse(match[2]);
+      this.hide();
       if (results.access_token) {
         // Keeping this to keep it backwards compatible, but also returning raw results to account for future changes.
-        this.props.onLoginSuccess(results.access_token, results)
+        this.props.onLoginSuccess(results.access_token, results);
       } else if (results.code) {
-
-        const first_page_load = webViewState?.loading === false && webViewState?.title === '';
-        if(!first_page_load)
-          return;
-
         //Fetching to get token with appId, appSecret and code
-        let { code } = results
-        code = code.split('#_').join('')
-        const { appId, appSecret, redirectUrl, scopes } = this.props
-        let headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
-        let http = axios.create({ baseURL: 'https://api.instagram.com/oauth/access_token',  headers: headers  })
-        let form = new FormData();
-        form.append( 'app_id', appId );
-        form.append( 'app_secret', appSecret );
-        form.append( 'grant_type', 'authorization_code' );
-        form.append( 'redirect_uri', redirectUrl );
-        form.append( 'code', code );
-        let res = await http.post( '/', form ).catch( (error) => { console.log( error.response ); return false })
+        let { code } = results;
+        code = code.split('#_').join('');
+        const { appId, appSecret, redirectUrl, responseType } = this.props;
+        if (responseType === 'code' && !appSecret) {
+          if (code) {
+            this.props.onLoginSuccess(code, results);
+          } else {
+            this.props.onLoginFailure(results);
+          }
+        } else {
+          let headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+          let http = axios.create({
+            baseURL: 'https://api.instagram.com/oauth/access_token',
+            headers: headers,
+          });
+          let form = new FormData();
+          form.append('app_id', appId);
+          form.append('app_secret', appSecret);
+          form.append('grant_type', 'authorization_code');
+          form.append('redirect_uri', redirectUrl);
+          form.append('code', code);
+          let res = await http.post('/', form).catch((error) => {
+            console.log(error.response);
+            return false;
+          });
 
-        if( res )
-        {
-          this.props.onLoginSuccess(res.data, results);
+          if (res) {
+            this.props.onLoginSuccess(res.data, results);
+          } else {
+            this.props.onLoginFailure(results);
+          }
         }
-        else
-        {
-          this.props.onLoginFailure(results)
-        }
-
-
       } else {
-        const first_page_load = webViewState?.loading === false && webViewState?.title === '';
-        if(!first_page_load)
-          return;
-
-        this.props.onLoginFailure(results)
+        this.props.onLoginFailure(results);
       }
     }
   }
