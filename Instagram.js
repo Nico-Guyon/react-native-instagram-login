@@ -160,7 +160,7 @@ export default class Instagram extends Component {
         thirdPartyCookiesEnabled={true}
         sharedCookiesEnabled={false}
         domStorageEnabled={false}
-        incognito={true}
+        // incognito={true}
       />
     )
   }
